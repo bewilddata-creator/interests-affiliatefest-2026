@@ -33,6 +33,14 @@ var TEXT_COLUMNS = {
   EditLog: ['lead_id', 'staff_id', 'old_value', 'new_value']
 };
 
+// Timestamp columns: always shown as full date + time (to the second).
+var TIME_FORMAT = 'dd/mm/yyyy hh:mm:ss';
+var TIME_COLUMNS = {
+  Leads: ['created_at', 'updated_at', 'received_at'],
+  LeadItems: ['updated_at'],
+  EditLog: ['logged_at']
+};
+
 // Lead fields the phone may send; compared on edit to fill the EditLog.
 var LEAD_FIELDS = ['customer_code', 'code_type', 'original_walkin_code', 'visitor_name',
   'visitor_phone', 'visitor_brand', 'lead_temp', 'next_action', 'samples_given', 'notes'];
@@ -59,8 +67,24 @@ function setup() {
       sh.getRange(2, col, sh.getMaxRows() - 1, 1).setNumberFormat('@');
     });
   });
+  applyTimeFormats_();
   getSecret_();
   Logger.log('Setup done. Spreadsheet time zone: ' + ss.getSpreadsheetTimeZone());
+}
+
+/** Make every timestamp column show date AND time (existing rows included). */
+function applyTimeFormats_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Object.keys(TIME_COLUMNS).forEach(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh || !sh.getLastColumn()) return;
+    var hdr = headers_(sh);
+    TIME_COLUMNS[name].forEach(function (h) {
+      var col = hdr.indexOf(h) + 1;
+      if (col) sh.getRange(2, col, sh.getMaxRows() - 1, 1).setNumberFormat(TIME_FORMAT);
+    });
+  });
+  PropertiesService.getScriptProperties().setProperty('TIME_FORMAT_APPLIED', TIME_FORMAT);
 }
 
 /** Run this to log every phone out immediately (they must log in again). */
@@ -232,6 +256,7 @@ function sync_(staff, leads) {
       return TABS[n].some(function (h) { return hdr.indexOf(h) === -1; });
     });
     if (missing) setup();
+    else if (PropertiesService.getScriptProperties().getProperty('TIME_FORMAT_APPLIED') !== TIME_FORMAT) applyTimeFormats_();
     var leadSh = ss.getSheetByName('Leads');
     var itemSh = ss.getSheetByName('LeadItems');
     var logSh = ss.getSheetByName('EditLog');
