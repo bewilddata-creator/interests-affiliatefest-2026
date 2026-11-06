@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Booth Leads</title>
+  <meta name="description" content="Sales staff lead notes for Affiliate Fest 2026">
+  <meta name="theme-color" content="#0f3d3e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Booth Leads">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Login -->
+  <main id="view-login" class="view" hidden>
+    <div class="login-card">
+      <img src="icons/icon-192.png" alt="" class="login-logo">
+      <h1>Booth Leads</h1>
+      <p class="muted">Affiliate Fest 2026 · Sales staff</p>
+      <form id="login-form" autocomplete="off">
+        <label>Staff ID
+          <input id="login-id" name="staff_id" autocapitalize="characters" autocorrect="off" spellcheck="false" required placeholder="e.g. S01">
+        </label>
+        <label>PIN
+          <input id="login-pin" name="pin" type="password" inputmode="numeric" required placeholder="••••">
+        </label>
+        <p id="login-error" class="error" hidden></p>
+        <button type="submit" class="btn primary block" id="login-btn">Log in</button>
+      </form>
+      <p class="muted small">You stay logged in on this phone for 30 days.</p>
+    </div>
+  </main>
+
+  <!-- App -->
+  <div id="view-app" class="view" hidden>
+    <header class="topbar">
+      <div>
+        <div class="who" id="who"></div>
+        <button class="sync-pill" id="sync-pill" type="button"></button>
+      </div>
+      <button class="btn ghost small" id="logout-btn" type="button">Log out</button>
+    </header>
+
+    <nav class="tabs">
+      <button type="button" class="tab active" data-tab="new">New lead</button>
+      <button type="button" class="tab" data-tab="mine">My leads <span id="mine-count" class="count"></span></button>
+    </nav>
+
+    <!-- New / edit lead -->
+    <main id="tab-new" class="tab-panel">
+      <div id="edit-banner" class="banner" hidden></div>
+
+      <section class="card">
+        <h2>1 · Visitor</h2>
+        <div class="seg" id="mode-seg">
+          <button type="button" data-mode="REGISTERED" class="on">Has code</button>
+          <button type="button" data-mode="WALKIN">Walk-in (no code)</button>
+        </div>
+
+        <div id="mode-registered">
+          <label>5-digit customer code
+            <input id="code" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="12345" class="code-input">
+          </label>
+        </div>
+
+        <div id="mode-walkin" hidden>
+          <div id="walkin-new">
+            <div class="walkin-code">
+              <span class="muted small">Walk-in code — tell the visitor</span>
+              <strong id="walkin-code"></strong>
+            </div>
+            <button type="button" class="link" id="walkin-existing-btn">Returning walk-in? Enter their W-code</button>
+          </div>
+          <div id="walkin-existing" hidden>
+            <label>Walk-in code
+              <input id="walkin-code-input" autocapitalize="characters" autocomplete="off" placeholder="W01-001" class="code-input">
+            </label>
+            <button type="button" class="link" id="walkin-new-btn">New walk-in instead</button>
+          </div>
+        </div>
+
+        <div id="link-code" hidden>
+          <label>Visitor registered? Enter their 5-digit code
+            <input id="link-code-input" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="12345" class="code-input">
+          </label>
+          <p class="muted small">This replaces the walk-in code on all of their leads. The W-code is kept for reference.</p>
+        </div>
+
+        <div id="history" class="history" hidden></div>
+
+        <label><span id="name-label">Visitor name</span>
+          <input id="visitor_name" autocomplete="off" placeholder="Name">
+        </label>
+        <div class="row2">
+          <label>Phone <span class="muted">(optional)</span>
+            <input id="visitor_phone" inputmode="tel" autocomplete="off">
+          </label>
+          <label>Brand / shop <span class="muted">(optional)</span>
+            <input id="visitor_brand" autocomplete="off">
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2 · Products of interest</h2>
+        <input id="product-search" type="search" autocomplete="off" placeholder="Search code, name, SKU or category">
+        <div id="cat-chips" class="chips"></div>
+        <div id="product-results" class="results"></div>
+        <div id="items"></div>
+      </section>
+
+      <section class="card">
+        <h2>3 · Lead</h2>
+        <span class="label">Lead temperature</span>
+        <div class="seg temp" id="temp-seg">
+          <button type="button" data-temp="Hot">Hot</button>
+          <button type="button" data-temp="Warm">Warm</button>
+          <button type="button" data-temp="Cold">Cold</button>
+        </div>
+        <label>Next action
+          <select id="next_action">
+            <option value="">—</option>
+            <option>Send quotation</option>
+            <option>Send catalog</option>
+            <option>Call back</option>
+            <option>Send more samples</option>
+            <option>None</option>
+          </select>
+        </label>
+        <label>Notes
+          <textarea id="notes" rows="5" placeholder="What did they ask about? Budget, MOQ, timeline, packaging…"></textarea>
+        </label>
+      </section>
+
+      <p id="form-error" class="error" hidden></p>
+      <div class="savebar">
+        <button type="button" class="btn ghost" id="cancel-edit" hidden>Cancel</button>
+        <button type="button" class="btn primary block" id="save-btn">Save lead</button>
+      </div>
+    </main>
+
+    <!-- My leads -->
+    <main id="tab-mine" class="tab-panel" hidden>
+      <input id="mine-search" type="search" autocomplete="off" placeholder="Search code, name, brand, product">
+      <div id="mine-list"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
