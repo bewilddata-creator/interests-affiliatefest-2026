@@ -2,9 +2,9 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.3.0';
+  var APP_VERSION = '1.4.0';
   var API_URL = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || '';
-  var K = { session: 'bl.session', products: 'bl.products', leads: 'bl.leads', seq: 'bl.walkinSeq.' };
+  var K = { session: 'bl.session', products: 'bl.products', leads: 'bl.leads', seq: 'bl.walkinSeq.', all: 'bl.allLeads' };
   var SYNC_BATCH = 15;
 
   /* ---------------------------------------------------------- storage */
@@ -118,6 +118,11 @@
   });
 
   function applyBootstrap(res) {
+    if (res.staff && session) {
+      var wasAdmin = isAdmin();
+      session.staff = res.staff; save(K.session, session);
+      if (wasAdmin !== isAdmin() && !$('view-app').hidden) startApp();   // role changed in the Sheet
+    }
     if (res.products) {
       products = res.products; save(K.products, products); renderCatChips();
       if (draft) renderResults();
@@ -139,6 +144,7 @@
     // Remove this staff's synced leads from the phone; keep unsynced ones.
     myLeadsList().forEach(function (l) { if (!l._pending) delete leads[l.lead_id]; });
     saveLeads();
+    allData = { leads: [], time: '' }; save(K.all, null);
     session = null; save(K.session, null);
     showLogin();
   });
@@ -151,8 +157,129 @@
     document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
     $('tab-new').hidden = name !== 'new';
     $('tab-mine').hidden = name !== 'mine';
+    $('tab-all').hidden = name !== 'all';
     if (name === 'mine') { renderMine(); refreshFromServer(); }
+    if (name === 'all') { renderAll(); loadAll(); }
     window.scrollTo(0, 0);
+  }
+
+  /* ------------------------------------------- admin: all leads (view only) */
+  function isAdmin() { return !!(session && session.staff && session.staff.role === 'admin'); }
+  var allData = load(K.all, null) || { leads: [], time: '' };
+  var allTemp = '', openLead = null, allLoading = false;
+
+  function loadAll(manual) {
+    if (!isAdmin() || allLoading) return;
+    allLoading = true; $('all-updated').textContent = 'Loading…';
+    api('allLeads', {}, 30000).then(function (res) {
+      if (!res.ok) throw new Error(res.message || 'Could not load leads');
+      allData = { leads: res.leads || [], time: res.time || nowIso() };
+      save(K.all, allData);
+      if (manual) toast('Updated ✓');
+    }).catch(function (e) {
+      if (manual) toast(/abort|network|fetch|load failed/i.test(e.message) ? 'No connection — showing the last saved copy.' : e.message, 3500);
+    }).then(function () { allLoading = false; renderAll(); });
+  }
+  $('all-refresh').addEventListener('click', function () { loadAll(true); });
+  $('all-search').addEventListener('input', renderAll);
+  $('all-staff').addEventListener('change', renderAll);
+  document.querySelectorAll('#all-temp button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      allTemp = b.dataset.temp;
+      document.querySelectorAll('#all-temp button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      renderAll();
+    });
+  });
+
+  function isTrueVal(v) { return v === true || String(v).toLowerCase() === 'true'; }
+
+  function renderAll() {
+    if (!isAdmin()) return;
+    var all = allData.leads.slice().sort(function (a, b) { return b.created_at < a.created_at ? -1 : 1; });
+    $('all-count').textContent = all.length || '';
+    $('all-updated').textContent = allData.time ? 'Updated ' + fmtTime(allData.time) : 'Not loaded yet';
+
+    // Staff filter options
+    var sel = $('all-staff'), cur = sel.value, names = {};
+    all.forEach(function (l) { names[l.staff_id] = l.staff_name || l.staff_id; });
+    sel.innerHTML = '';
+    sel.appendChild(h('option', { value: '', text: 'All staff' }));
+    Object.keys(names).sort(function (a, b) { return names[a] < names[b] ? -1 : 1; })
+      .forEach(function (id) { sel.appendChild(h('option', { value: id, text: names[id] })); });
+    sel.value = names[cur] ? cur : '';
+
+    var q = norm($('all-search').value).trim();
+    var list = all.filter(function (l) {
+      if (sel.value && l.staff_id !== sel.value) return false;
+      if (allTemp && l.lead_temp !== allTemp) return false;
+      if (!q) return true;
+      return norm([l.customer_code, l.original_walkin_code, l.visitor_name, l.visitor_brand, l.visitor_phone, l.notes, l.staff_name, l.next_action]
+        .concat((l.items || []).map(function (i) { return i.product_code + ' ' + i.product_name + ' ' + i.category + ' ' + i.main_category; })).join(' ')).indexOf(q) !== -1;
+    });
+
+    // Summary for what is shown
+    var count = { Hot: 0, Warm: 0, Cold: 0 }, samples = 0, prod = {};
+    list.forEach(function (l) {
+      if (count[l.lead_temp] != null) count[l.lead_temp]++;
+      if (isTrueVal(l.samples_given)) samples++;
+      (l.items || []).forEach(function (i) {
+        var p = prod[i.product_code] || (prod[i.product_code] = { name: i.product_name || i.product_code, n: 0, high: 0 });
+        p.n++; if (i.interest_level === 'High') p.high++;
+      });
+    });
+    var top = Object.keys(prod).map(function (k) { return prod[k]; })
+      .sort(function (a, b) { return b.n - a.n || b.high - a.high; }).slice(0, 8);
+    var sum = $('all-summary'); sum.innerHTML = '';
+    sum.appendChild(h('div', { class: 'stats' }, [
+      h('div', { class: 'stat' }, [h('b', { text: String(list.length) }), h('span', { text: 'Leads' })]),
+      h('div', { class: 'stat Hot' }, [h('b', { text: String(count.Hot) }), h('span', { text: 'Hot' })]),
+      h('div', { class: 'stat Warm' }, [h('b', { text: String(count.Warm) }), h('span', { text: 'Warm' })]),
+      h('div', { class: 'stat Cold' }, [h('b', { text: String(count.Cold) }), h('span', { text: 'Cold' })])
+    ]));
+    sum.appendChild(h('div', { class: 'muted small', style: 'margin-top:8px', text: samples + ' visitor(s) given samples' }));
+    if (top.length) {
+      sum.appendChild(h('div', { class: 'group-head', text: 'Most requested products' }));
+      sum.appendChild(h('ul', { class: 'top-list' }, top.map(function (p) {
+        return h('li', null, [h('span', { text: p.name }), h('span', { class: 'n', text: p.n + (p.high ? ' · ' + p.high + ' high' : '') })]);
+      })));
+    }
+
+    // List
+    var box = $('all-list'); box.innerHTML = '';
+    if (!list.length) { box.appendChild(h('div', { class: 'empty', text: all.length ? 'No leads match these filters.' : 'No leads yet.' })); return; }
+    list.forEach(function (l) {
+      var open = openLead === l.lead_id;
+      var card = h('button', { type: 'button', class: 'lead' + (open ? ' open' : ''),
+        onclick: function () { openLead = open ? null : l.lead_id; renderAll(); } }, [
+        h('div', { class: 'lead-top' }, [
+          h('span', { class: 'lead-code', text: l.customer_code }),
+          l.lead_temp ? h('span', { class: 'badge ' + l.lead_temp, text: l.lead_temp }) : null
+        ]),
+        h('div', { class: 'lead-name', text: [l.visitor_name, l.visitor_brand].filter(Boolean).join(' · ') || '(no name)' }),
+        h('div', { class: 'lead-meta', text: (l.staff_name || l.staff_id) + ' · ' + (l.items || []).length + ' product(s)' +
+          (isTrueVal(l.samples_given) ? ' · samples ✓' : '') + ' · ' + fmtTime(l.created_at) }),
+        open ? leadDetail(l) : null
+      ]);
+      box.appendChild(card);
+    });
+  }
+
+  function leadDetail(l) {
+    var row = function (k, v) { return v ? h('div', { class: 'row' }, [h('span', { class: 'k', text: k + ': ' }), v]) : null; };
+    return h('div', { class: 'lead-detail' }, [
+      row('Phone', l.visitor_phone),
+      row('Was walk-in', l.original_walkin_code),
+      (l.items || []).length ? h('div', { class: 'row' }, [h('span', { class: 'k', text: 'Products:' }),
+        h('ul', null, l.items.map(function (i) {
+          return h('li', null, [i.product_name || i.product_code, i.interest_level ? h('span', { class: 'lvl ' + i.interest_level, text: i.interest_level }) : null]);
+        }))]) : null,
+      row('Samples given', isTrueVal(l.samples_given) ? 'Yes' : 'No'),
+      row('Next action', l.next_action),
+      row('Notes', l.notes),
+      row('Created', fmtTime(l.created_at)),
+      l.edit_count ? row('Edited', l.edit_count + '× · last ' + fmtTime(l.updated_at)) : null,
+      h('div', { class: 'readonly-note', text: 'View only' })
+    ]);
   }
 
   /* ------------------------------------------------------------- form */
@@ -390,8 +517,9 @@
       box.appendChild(h('button', { type: 'button', class: 'btn ghost small', text: '‹ Choose products', onclick: function () { showPage('browse'); } }));
     }
     draft.items.forEach(function (it, idx) {
-      var seg = h('div', { class: 'seg mini' }, ['High', 'Medium', 'Low'].map(function (lvl) {
-        return h('button', { type: 'button', class: it.interest_level === lvl ? 'on' : '', text: lvl,
+      if (!it.interest_level) it.interest_level = 'Medium';
+      var seg = h('div', { class: 'seg mini interest' }, ['Low', 'Medium', 'High'].map(function (lvl) {
+        return h('button', { type: 'button', class: it.interest_level === lvl ? 'on' : '', 'data-lvl': lvl, text: lvl,
           onclick: function () { it.interest_level = lvl; renderItems(); } });
       }));
       box.appendChild(h('div', { class: 'item' }, [
@@ -637,6 +765,7 @@
   function pendingLeads() { return myLeadsList().filter(function (l) { return l._pending; }); }
 
   function updateSyncPill() {
+    if (isAdmin()) { $('sync-pill').className = 'sync-pill'; $('sync-pill').textContent = '👁 Admin · view only'; return; }
     var p = $('sync-pill'), n = pendingLeads().length;
     var errs = myLeadsList().filter(function (l) { return l._error; }).length;
     p.className = 'sync-pill' + (errs ? ' error' : n ? ' pending' : '');
@@ -649,6 +778,7 @@
 
   function syncNow(manual) {
     if (syncing || !session) return;
+    if (isAdmin()) { if (manual) loadAll(true); return; }
     var batch = pendingLeads().slice(0, SYNC_BATCH);
     if (!batch.length) { if (manual) toast('Everything is synced ✓'); updateSyncPill(); return; }
     syncing = true; updateSyncPill();
@@ -685,6 +815,7 @@
   function refreshFromServer() {
     if (!session) return;
     api('bootstrap', {}, 20000).then(function (res) { if (res.ok) applyBootstrap(res); }).catch(function () {});
+    if (isAdmin()) { loadAll(); return; }
     api('myLeads', {}, 25000).then(function (res) {
       if (!res.ok) return;
       (res.leads || []).forEach(function (s) {
@@ -708,10 +839,16 @@
     $('view-login').hidden = true; $('view-app').hidden = false;
     $('who').textContent = session.staff.name + ' · ' + session.staff.staff_id;
     $('walkin-existing-btn').hidden = false;
+    var admin = isAdmin();
+    document.querySelector('.tab[data-tab="new"]').hidden = admin;
+    document.querySelector('.tab[data-tab="mine"]').hidden = admin;
+    document.querySelector('.tab[data-tab="all"]').hidden = !admin;
     resetForm();
     renderCatChips();
     $('mine-count').textContent = myLeadsList().length || '';
     updateSyncPill();
+    if (admin) { showTab('all'); return; }
+    showTab('new');
     syncNow();
   }
 

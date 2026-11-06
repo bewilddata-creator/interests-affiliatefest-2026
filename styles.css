@@ -131,6 +131,33 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); out
 .cart-badge.bump { animation: bump .3s ease; }
 @keyframes bump { 50% { transform: scale(1.35); } }
 .tap-hint { margin: 8px 0 0; }
+
+/* Interest levels: Low · Medium · High */
+.seg.interest button[data-lvl="Low"].on { background: #7b8794; color: #fff; }
+.seg.interest button[data-lvl="Medium"].on { background: var(--warm); color: #fff; }
+.seg.interest button[data-lvl="High"].on { background: var(--ok); color: #fff; }
+.lvl { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; color: #fff; margin-left: 6px; }
+.lvl.Low { background: #7b8794; } .lvl.Medium { background: var(--warm); } .lvl.High { background: var(--ok); }
+
+/* Admin: all leads */
+.all-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.all-filters { display: flex; gap: 8px; margin: 10px 0; align-items: center; }
+.all-filters select { margin: 0; width: auto; flex: 1; padding: 9px 30px 9px 10px; font-size: 15px; }
+.all-filters .seg { flex: 1.4; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+.stat { background: var(--bg); border-radius: 10px; padding: 8px 4px; }
+.stat b { display: block; font-size: 22px; }
+.stat span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.stat.Hot b { color: var(--hot); } .stat.Warm b { color: var(--warm); } .stat.Cold b { color: var(--cold); }
+.top-list { margin: 12px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.top-list li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--bg); }
+.top-list .n { font-weight: 800; white-space: nowrap; }
+.lead.open { outline: 2px solid var(--brand); }
+.lead-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 14px; }
+.lead-detail .row { margin: 4px 0; }
+.lead-detail .k { color: var(--muted); font-weight: 600; }
+.lead-detail ul { margin: 4px 0; padding-left: 18px; }
+.readonly-note { font-size: 12px; color: var(--muted); margin-top: 8px; }
 .multi { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .multi summary { list-style: none; padding: 12px 40px 12px 12px; cursor: pointer; position: relative; }
 .multi summary::-webkit-details-marker { display: none; }

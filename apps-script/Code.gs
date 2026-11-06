@@ -14,7 +14,7 @@ var MAX_LOGIN_FAILS = 5;      // wrong PINs before a temporary lock
 var LOCK_MINUTES = 10;
 
 var TABS = {
-  Staff: ['staff_id', 'name', 'pin', 'active'],
+  Staff: ['staff_id', 'name', 'pin', 'active', 'role'],   // role: blank = sales staff, "admin" = view-only, sees everyone's leads
   Products: ['product_code', 'product_name', 'product_SKU', 'main_category', 'category', 'active'],
   Leads: ['lead_id', 'customer_code', 'code_type', 'original_walkin_code', 'visitor_name',
     'visitor_phone', 'visitor_brand', 'staff_id', 'staff_name', 'lead_temp', 'next_action',
@@ -84,8 +84,15 @@ function doPost(e) {
     if (!staff) return json_({ ok: false, error: 'AUTH', message: 'Please log in again.' });
     if (action === 'bootstrap') return json_(bootstrap_(staff));
     if (action === 'products') return json_({ ok: true, products: getProducts_() });
-    if (action === 'sync') return json_(sync_(staff, body.leads || []));
+    if (action === 'sync') {
+      if (staff.role === 'admin') return json_({ ok: false, error: 'READ_ONLY', message: 'Admin accounts are view-only.' });
+      return json_(sync_(staff, body.leads || []));
+    }
     if (action === 'myLeads') return json_({ ok: true, leads: myLeads_(staff) });
+    if (action === 'allLeads') {
+      if (staff.role !== 'admin') return json_({ ok: false, error: 'FORBIDDEN', message: 'Only admin accounts can see all leads.' });
+      return json_({ ok: true, leads: leadsWhere_(function () { return true; }), time: new Date().toISOString() });
+    }
     if (action === 'lookup') return json_({ ok: true, history: lookup_(body.code) });
     return json_({ ok: false, error: 'BAD_ACTION' });
   } catch (err) {
@@ -129,7 +136,7 @@ function login_(body) {
 function bootstrap_(staff) {
   return {
     ok: true,
-    staff: { staff_id: staff.staff_id, name: staff.name },
+    staff: { staff_id: staff.staff_id, name: staff.name, role: staff.role },
     products: getProducts_(),
     walkin_seq: maxWalkinSeq_(staff.staff_id)
   };
@@ -147,7 +154,8 @@ function findStaff_(id) {
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
     if (String(r.staff_id).trim().toUpperCase() === id) {
-      return { staff_id: String(r.staff_id).trim(), name: String(r.name || '').trim(), pin: r.pin, active: isTrue_(r.active) };
+      return { staff_id: String(r.staff_id).trim(), name: String(r.name || '').trim(), pin: r.pin, active: isTrue_(r.active),
+        role: String(r.role || '').trim().toLowerCase() === 'admin' ? 'admin' : 'staff' };
     }
   }
   return null;
@@ -350,7 +358,12 @@ function relinkWalkin_(leadSh, itemSh, logSh, leadHdr, itemHdr, logHdr, wCode, n
 
 function myLeads_(staff) {
   var sid = staff.staff_id.toUpperCase();
-  var leads = readTable_('Leads').filter(function (r) { return String(r.staff_id).trim().toUpperCase() === sid; });
+  return leadsWhere_(function (r) { return String(r.staff_id).trim().toUpperCase() === sid; });
+}
+
+/** Leads (with their product rows) that pass the filter. */
+function leadsWhere_(keep) {
+  var leads = readTable_('Leads').filter(function (r) { return String(r.lead_id).trim() && keep(r); });
   var byId = {};
   leads.forEach(function (r) { byId[String(r.lead_id)] = []; });
   readTable_('LeadItems').forEach(function (it) {

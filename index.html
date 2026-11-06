@@ -50,6 +50,7 @@
     <nav class="tabs">
       <button type="button" class="tab active" data-tab="new">New lead</button>
       <button type="button" class="tab" data-tab="mine">My leads <span id="mine-count" class="count"></span></button>
+      <button type="button" class="tab" data-tab="all" hidden>All leads <span id="all-count" class="count"></span></button>
     </nav>
 
     <!-- New / edit lead -->
@@ -183,6 +184,26 @@
     <main id="tab-mine" class="tab-panel" hidden>
       <input id="mine-search" type="search" autocomplete="off" placeholder="Search code, name, brand, product">
       <div id="mine-list"></div>
+    </main>
+
+    <!-- All leads (admin, read-only) -->
+    <main id="tab-all" class="tab-panel" hidden>
+      <div class="all-head">
+        <span class="muted small" id="all-updated"></span>
+        <button type="button" class="btn ghost small" id="all-refresh">↻ Refresh</button>
+      </div>
+      <section class="card" id="all-summary"></section>
+      <input id="all-search" type="search" autocomplete="off" placeholder="Search code, name, brand, product, notes">
+      <div class="all-filters">
+        <select id="all-staff"><option value="">All staff</option></select>
+        <div class="seg mini" id="all-temp">
+          <button type="button" data-temp="" class="on">All</button>
+          <button type="button" data-temp="Hot">Hot</button>
+          <button type="button" data-temp="Warm">Warm</button>
+          <button type="button" data-temp="Cold">Cold</button>
+        </div>
+      </div>
+      <div id="all-list"></div>
     </main>
   </div>
 

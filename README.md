@@ -28,6 +28,7 @@ Open the GitHub Pages link in **Safari** → Share → **Add to Home Screen**. O
 | Task | How |
 |---|---|
 | Lock a staff member out | Set `active` to FALSE in `Staff` (applies at their next sync) |
+| Give a manager/boss view-only access to all leads | Put `admin` in their `role` cell in `Staff` (blank = normal sales staff). Admins cannot create or edit leads |
 | Log out every phone | In Apps Script, run `logoutEveryone` |
 | Hide a product | Set `active` to FALSE in `Products` |
 | Change the backend code | Deploy → **Manage deployments** → edit → **New version** (keeps the same URL) |
