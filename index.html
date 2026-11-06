@@ -141,16 +141,17 @@
           <button type="button" data-temp="Warm">Warm</button>
           <button type="button" data-temp="Cold">Cold</button>
         </div>
-        <label>Next action
-          <select id="next_action">
-            <option value="">—</option>
-            <option>Send quotation</option>
-            <option>Send catalog</option>
-            <option>Call back</option>
-            <option>Send more samples</option>
-            <option>None</option>
-          </select>
-        </label>
+        <span class="label">Next action <span class="muted">(choose one or more)</span></span>
+        <details class="multi" id="next-action-dd">
+          <summary id="next-action-summary">Choose…</summary>
+          <div class="multi-list" id="next-action-list">
+            <label><input type="checkbox" value="Send quotation"> Send quotation</label>
+            <label><input type="checkbox" value="Send catalog"> Send catalog</label>
+            <label><input type="checkbox" value="Call back"> Call back</label>
+            <label><input type="checkbox" value="Send more samples"> Send more samples</label>
+            <label><input type="checkbox" value="None"> None</label>
+          </div>
+        </details>
         <label>Notes
           <textarea id="notes" rows="5" placeholder="What did they ask about? Budget, MOQ, timeline, packaging…"></textarea>
         </label>
@@ -161,6 +162,7 @@
 
       <div class="savebar" id="bar-browse">
         <button type="button" class="btn ghost" id="cancel-edit-b" hidden>Cancel</button>
+        <button type="button" class="btn ghost" id="clear-b">Clear</button>
         <button type="button" class="btn primary block cart-btn" id="cart-btn">
           <span class="cart-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2L21.5 7H6"/></svg>
@@ -172,6 +174,7 @@
       </div>
       <div class="savebar" id="bar-cart" hidden>
         <button type="button" class="btn ghost" id="cancel-edit" hidden>Cancel</button>
+        <button type="button" class="btn ghost" id="clear-c">Clear</button>
         <button type="button" class="btn primary block" id="save-btn">Save lead</button>
       </div>
     </main>
