@@ -124,7 +124,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); out
 .item-row .seg { flex: 1; min-width: 200px; }
 .check { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; font-size: 15px; }
 .check input { width: 24px; height: 24px; margin: 0; -webkit-appearance: checkbox; appearance: auto; accent-color: var(--brand); }
-.samples-check { margin-top: 16px; padding: 12px; border-radius: 12px; background: var(--accent); }
+.cart-btn { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.cart-icon { position: relative; display: inline-flex; }
+.cart-badge { position: absolute; top: -8px; right: -10px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: #ffd27a; color: #4a3200; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; }
+.cart-badge.bump { animation: bump .3s ease; }
+@keyframes bump { 50% { transform: scale(1.35); } }
+.tap-hint { margin: 8px 0 0; }
+.back-link { display: block; margin: 0 0 6px; font-size: 16px; text-decoration: none; }
+.cart-visitor { background: var(--card); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 12px; font-weight: 700; }
+.cart-visitor.missing { background: #fff1f0; color: var(--err); }
+.result.added { opacity: 1; border-color: var(--brand); background: var(--accent); }
+.result.added .plus { color: #fff; background: var(--brand); border-radius: 999px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+.samples-check { margin-top: 0; padding: 12px; border-radius: 12px; background: var(--accent); }
 .samples-check + .muted { margin: 6px 2px 0; }
 .group-head { margin: 14px 0 2px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .qty { display: flex; align-items: center; gap: 6px; }

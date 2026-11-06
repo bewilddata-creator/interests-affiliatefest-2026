@@ -56,6 +56,8 @@
     <main id="tab-new" class="tab-panel">
       <div id="edit-banner" class="banner" hidden></div>
 
+      <!-- Page A: visitor + browse products -->
+      <div id="page-browse">
       <section class="card">
         <h2>1 · Visitor</h2>
         <div class="seg" id="mode-seg">
@@ -105,22 +107,34 @@
             <input id="visitor_brand" autocomplete="off">
           </label>
         </div>
+        <p id="visitor-error" class="error" hidden></p>
       </section>
 
       <section class="card">
         <h2>2 · Products of interest</h2>
-        <input id="product-search" type="search" autocomplete="off" placeholder="Search code, name, SKU or category">
+        <input id="product-search" type="search" autocomplete="off" placeholder="Search code, name or category">
         <div id="cat-chips" class="chips"></div>
+        <p class="muted small tap-hint">Tap to add · tap again to remove</p>
         <div id="product-results" class="results"></div>
+      </section>
+      </div>
+
+      <!-- Page B: cart = chosen products + lead details -->
+      <div id="page-cart" hidden>
+      <button type="button" class="link back-link" id="back-to-browse">‹ Back to products</button>
+      <div id="cart-visitor" class="cart-visitor"></div>
+
+      <section class="card">
+        <h2>Products of interest <span id="cart-count-h" class="count"></span></h2>
         <div id="items"></div>
+      </section>
+
+      <section class="card">
+        <h2>Lead</h2>
         <label class="check samples-check">
           <input type="checkbox" id="samples_given"> Samples given to this visitor
         </label>
         <p class="muted small">Just tick it. The items given are recorded at the cashier (POS).</p>
-      </section>
-
-      <section class="card">
-        <h2>3 · Lead</h2>
         <span class="label">Lead temperature</span>
         <div class="seg temp" id="temp-seg">
           <button type="button" data-temp="Hot">Hot</button>
@@ -143,7 +157,20 @@
       </section>
 
       <p id="form-error" class="error" hidden></p>
-      <div class="savebar">
+      </div>
+
+      <div class="savebar" id="bar-browse">
+        <button type="button" class="btn ghost" id="cancel-edit-b" hidden>Cancel</button>
+        <button type="button" class="btn primary block cart-btn" id="cart-btn">
+          <span class="cart-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2L21.5 7H6"/></svg>
+            <span class="cart-badge" id="cart-badge">0</span>
+          </span>
+          <span id="cart-btn-text">Review &amp; save</span>
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
+      <div class="savebar" id="bar-cart" hidden>
         <button type="button" class="btn ghost" id="cancel-edit" hidden>Cancel</button>
         <button type="button" class="btn primary block" id="save-btn">Save lead</button>
       </div>

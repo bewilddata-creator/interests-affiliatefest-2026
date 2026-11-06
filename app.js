@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.1.0';
+  var APP_VERSION = '1.2.0';
   var API_URL = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || '';
   var K = { session: 'bl.session', products: 'bl.products', leads: 'bl.leads', seq: 'bl.walkinSeq.' };
   var SYNC_BATCH = 15;
@@ -279,7 +279,6 @@
   function renderResults() {
     var q = norm($('product-search').value).trim();
     var box = $('product-results'); box.innerHTML = '';
-    if (!q && !activeCat) return;
     var words = q.split(/\s+/).filter(Boolean);
     var hits = products.filter(function (p) {
       if (activeCat && mainCat(p) !== activeCat) return false;
@@ -300,7 +299,8 @@
     });
     function renderResult(p) {
       var added = draft.items.some(function (i) { return i.product_code === p.product_code; });
-      box.appendChild(h('button', { type: 'button', class: 'result' + (added ? ' added' : ''), onclick: function () { addItem(p); } }, [
+      box.appendChild(h('button', { type: 'button', class: 'result' + (added ? ' added' : ''), 'aria-pressed': added ? 'true' : 'false',
+        onclick: function () { toggleItem(p); } }, [
         h('div', null, [
           h('div', { class: 'r-main', text: p.product_name || p.product_code }),
           h('div', { class: 'r-sub', text: [p.product_code, p.product_SKU && 'SKU ' + p.product_SKU, p.category].filter(Boolean).join(' · ') })
@@ -313,20 +313,64 @@
       var raw = $('product-search').value.trim();
       box.appendChild(h('div', { class: 'muted small', text: products.length ? 'No product matches “' + raw + '”.' : 'Product list not loaded yet (needs internet once).' }));
       box.appendChild(h('button', { type: 'button', class: 'btn ghost small', text: 'Add “' + raw + '” as a custom item',
-        onclick: function () { addItem({ product_code: raw.toUpperCase(), product_name: raw, product_SKU: '', main_category: 'Other', category: 'Custom' }); } }));
+        onclick: function () {
+          toggleItem({ product_code: raw.toUpperCase(), product_name: raw, product_SKU: '', main_category: 'Other', category: 'Custom' });
+          $('product-search').value = ''; renderResults();
+        } }));
     }
   }
 
-  function addItem(p) {
-    if (draft.items.some(function (i) { return i.product_code === p.product_code; })) { toast('Already added'); return; }
-    draft.items.push({ product_code: p.product_code, product_name: p.product_name, product_SKU: p.product_SKU || '',
+  /** Tap once to add a product, tap again to remove it. */
+  function toggleItem(p) {
+    var idx = -1;
+    draft.items.forEach(function (i, n) { if (i.product_code === p.product_code) idx = n; });
+    if (idx >= 0) draft.items.splice(idx, 1);
+    else draft.items.push({ product_code: p.product_code, product_name: p.product_name, product_SKU: p.product_SKU || '',
       main_category: p.main_category || '', category: p.category || '', interest_level: 'Medium' });
-    $('product-search').value = '';
-    renderResults(); renderItems();
+    renderResults(); renderItems(); updateCart(true);
+  }
+
+  function updateCart(bump) {
+    var n = draft.items.length, badge = $('cart-badge');
+    badge.textContent = n;
+    $('cart-count-h').textContent = n || '';
+    $('cart-btn-text').textContent = editingId ? 'Review changes' : 'Review & save';
+    if (bump) { badge.classList.remove('bump'); void badge.offsetWidth; badge.classList.add('bump'); }
+  }
+
+  /* ---------------------------------------------- browse page / cart page */
+  function showPage(name) {
+    var cart = name === 'cart';
+    $('page-browse').hidden = cart; $('bar-browse').hidden = cart;
+    $('page-cart').hidden = !cart; $('bar-cart').hidden = !cart;
+    if (cart) { renderCartVisitor(); renderItems(); } else { $('visitor-error').hidden = true; }
+    window.scrollTo(0, 0);
+  }
+  $('cart-btn').addEventListener('click', function () { formError(''); showPage('cart'); });
+  $('back-to-browse').addEventListener('click', function () { showPage('browse'); });
+
+  function renderCartVisitor() {
+    var el = $('cart-visitor'), name = $('visitor_name').value.trim(), code;
+    if (editingId) code = draft.mode === 'WALKIN' ? 'Walk-in ' + draft.customer_code : 'Customer ' + ($('code').value.trim() || draft.customer_code);
+    else if (draft.mode === 'REGISTERED') code = currentCode() ? 'Customer ' + currentCode() : '';
+    else code = draft.walkinExisting ? (currentCode() ? 'Walk-in ' + currentCode() : '') : (name ? 'New walk-in ' + nextWalkinCode() : '');
+    el.className = 'cart-visitor' + (code ? '' : ' missing');
+    el.textContent = code ? [code, name].filter(Boolean).join(' · ')
+      : (draft.mode === 'WALKIN' ? 'Walk-in needs a name — tap Back to add it' : 'No customer code yet — tap Back to add it');
+  }
+
+  function visitorError(msg) {
+    showPage('browse');
+    var e = $('visitor-error'); e.textContent = msg; e.hidden = false;
+    e.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function renderItems() {
     var box = $('items'); box.innerHTML = '';
+    if (!draft.items.length) {
+      box.appendChild(h('div', { class: 'muted small', text: 'No products yet.' }));
+      box.appendChild(h('button', { type: 'button', class: 'btn ghost small', text: '‹ Choose products', onclick: function () { showPage('browse'); } }));
+    }
     draft.items.forEach(function (it, idx) {
       var seg = h('div', { class: 'seg mini' }, ['High', 'Medium', 'Low'].map(function (lvl) {
         return h('button', { type: 'button', class: it.interest_level === lvl ? 'on' : '', text: lvl,
@@ -338,7 +382,7 @@
             h('div', { class: 'item-title', text: it.product_name || it.product_code }),
             h('div', { class: 'item-sub', text: [it.product_code, it.product_SKU && 'SKU ' + it.product_SKU, it.category].filter(Boolean).join(' · ') })
           ]),
-          h('button', { type: 'button', class: 'remove', 'aria-label': 'Remove', text: '×', onclick: function () { draft.items.splice(idx, 1); renderItems(); renderResults(); } })
+          h('button', { type: 'button', class: 'remove', 'aria-label': 'Remove', text: '×', onclick: function () { draft.items.splice(idx, 1); renderItems(); renderResults(); updateCart(); } })
         ]),
         h('div', { class: 'item-row' }, [seg])
       ]));
@@ -374,12 +418,14 @@
       lead = Object.assign({}, old, base);
       if (old.code_type === 'REGISTERED') {
         var c = $('code').value.trim();
-        if (!/^\d{5}$/.test(c)) return formError('Customer code must be 5 digits.');
+        if (!/^\d{5}$/.test(c)) return visitorError('Customer code must be 5 digits.');
         lead.customer_code = c;
       }
       var link = $('link-code-input').value.trim();
+      if (old.code_type === 'WALKIN' && link && !/^\d{5}$/.test(link)) return visitorError('Registered code must be 5 digits.');
+      if (old.code_type === 'WALKIN' && !vname) return visitorError('Walk-in visitors need a name.');
+      if (!lead.lead_temp) return formError('Choose a lead temperature (Hot / Warm / Cold).');
       if (old.code_type === 'WALKIN' && link) {
-        if (!/^\d{5}$/.test(link)) return formError('Registered code must be 5 digits.');
         lead.original_walkin_code = old.customer_code;
         lead.customer_code = link;
         lead.code_type = 'REGISTERED';
@@ -391,26 +437,25 @@
           }
         });
       }
-      if (lead.code_type === 'WALKIN' && !vname) return formError('Walk-in visitors need a name.');
-      if (!lead.lead_temp) return formError('Choose a lead temperature (Hot / Warm / Cold).');
       lead.updated_at = nowIso();
       lead._pending = true; delete lead._error;
     } else {
       var code, type = draft.mode;
       if (type === 'REGISTERED') {
         code = currentCode();
-        if (!code) return formError('Enter the 5-digit customer code, or switch to Walk-in.');
+        if (!code) return visitorError('Enter the 5-digit customer code, or switch to Walk-in.');
       } else {
-        if (!vname) return formError('Walk-in visitors need a name.');
+        if (!vname) return visitorError('Walk-in visitors need a name.');
         if (draft.walkinExisting) {
           code = currentCode();
-          if (!code) return formError('Enter the walk-in code, e.g. ' + walkinPrefix() + '001.');
-        } else {
-          code = nextWalkinCode();
-          reserveWalkinCode(code);
+          if (!code) return visitorError('Enter the walk-in code, e.g. ' + walkinPrefix() + '001.');
         }
       }
       if (!draft.lead_temp) return formError('Choose a lead temperature (Hot / Warm / Cold).');
+      if (type === 'WALKIN' && !draft.walkinExisting) {   // reserve the code only once the lead is valid
+        code = nextWalkinCode();
+        reserveWalkinCode(code);
+      }
       var t = nowIso();
       lead = Object.assign(base, {
         lead_id: uuid(), customer_code: code, code_type: type, original_walkin_code: '',
@@ -429,7 +474,9 @@
     if (wasEdit) showTab('mine');
   });
 
-  $('cancel-edit').addEventListener('click', function () { resetForm(); showTab('mine'); });
+  ['cancel-edit', 'cancel-edit-b'].forEach(function (id) {
+    $(id).addEventListener('click', function () { resetForm(); showTab('mine'); });
+  });
 
   function resetForm() {
     editingId = null;
@@ -439,6 +486,8 @@
     $('samples_given').checked = false;
     $('edit-banner').hidden = true;
     $('cancel-edit').hidden = true;
+    $('cancel-edit-b').hidden = true;
+    $('visitor-error').hidden = true;
     $('link-code').hidden = true;
     $('walkin-existing-btn').hidden = false;
     $('save-btn').textContent = 'Save lead';
@@ -448,7 +497,8 @@
     activeCat = ''; renderCatChips();
     setMode('REGISTERED');
     renderItems(); renderResults(); renderTemp();
-    window.scrollTo(0, 0);
+    updateCart();
+    showPage('browse');
   }
 
   function editLead(id) {
@@ -484,11 +534,13 @@
       (l.original_walkin_code ? ' · was walk-in ' + l.original_walkin_code : '') }));
     b.hidden = false;
     $('cancel-edit').hidden = false;
+    $('cancel-edit-b').hidden = false;
     $('save-btn').textContent = 'Save changes';
     $('history').hidden = true;
     document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.dataset.tab === 'new'); });
     $('tab-new').hidden = false; $('tab-mine').hidden = true;
-    window.scrollTo(0, 0);
+    renderResults(); updateCart();
+    showPage('cart');
   }
 
   /* --------------------------------------------------------- my leads */
