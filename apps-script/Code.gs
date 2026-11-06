@@ -15,12 +15,12 @@ var LOCK_MINUTES = 10;
 
 var TABS = {
   Staff: ['staff_id', 'name', 'pin', 'active'],
-  Products: ['product_code', 'product_name', 'product_SKU', 'category', 'active'],
+  Products: ['product_code', 'product_name', 'product_SKU', 'main_category', 'category', 'active'],
   Leads: ['lead_id', 'customer_code', 'code_type', 'original_walkin_code', 'visitor_name',
     'visitor_phone', 'visitor_brand', 'staff_id', 'staff_name', 'lead_temp', 'next_action',
-    'notes', 'created_at', 'updated_at', 'received_at', 'edit_count'],
+    'samples_given', 'notes', 'created_at', 'updated_at', 'received_at', 'edit_count'],
   LeadItems: ['lead_id', 'customer_code', 'product_code', 'product_name', 'product_SKU',
-    'category', 'interest_level', 'sample_given', 'sample_qty', 'staff_id', 'updated_at'],
+    'main_category', 'category', 'interest_level', 'staff_id', 'updated_at'],
   EditLog: ['logged_at', 'lead_id', 'staff_id', 'field', 'old_value', 'new_value']
 };
 
@@ -35,7 +35,7 @@ var TEXT_COLUMNS = {
 
 // Lead fields the phone may send; compared on edit to fill the EditLog.
 var LEAD_FIELDS = ['customer_code', 'code_type', 'original_walkin_code', 'visitor_name',
-  'visitor_phone', 'visitor_brand', 'lead_temp', 'next_action', 'notes'];
+  'visitor_phone', 'visitor_brand', 'lead_temp', 'next_action', 'samples_given', 'notes'];
 
 /* ------------------------------------------------------------------ setup */
 
@@ -203,6 +203,7 @@ function getProducts_() {
         product_code: String(r.product_code).trim(),
         product_name: String(r.product_name || '').trim(),
         product_SKU: String(r.product_SKU || '').trim(),
+        main_category: String(r.main_category || '').trim(),
         category: String(r.category || '').trim()
       };
     });
@@ -215,6 +216,14 @@ function sync_(staff, leads) {
   lock.waitLock(25000);
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // New columns added in an update: create them automatically if setup was not re-run.
+    var missing = ['Leads', 'LeadItems', 'EditLog'].some(function (n) {
+      var sh = ss.getSheetByName(n);
+      if (!sh || !sh.getLastColumn()) return true;
+      var hdr = headers_(sh);
+      return TABS[n].some(function (h) { return hdr.indexOf(h) === -1; });
+    });
+    if (missing) setup();
     var leadSh = ss.getSheetByName('Leads');
     var itemSh = ss.getSheetByName('LeadItems');
     var logSh = ss.getSheetByName('EditLog');
@@ -276,8 +285,9 @@ function upsertLead_(staff, lead, leadSh, itemSh, logSh, leadHdr, itemHdr, logHd
 
   var changes = [];
   LEAD_FIELDS.forEach(function (f) {
-    var before = String(old[f] == null ? '' : old[f]);
-    if (before !== clean[f]) changes.push([f, before, clean[f]]);
+    var before = f === 'samples_given' ? String(isTrue_(old[f])) : String(old[f] == null ? '' : old[f]);
+    var after = String(clean[f]);
+    if (before !== after) changes.push([f, before, after]);
   });
   var oldItemsText = itemsSummary_(readItems_(itemSh, itemHdr, id));
   var newItemsText = itemsSummary_(items);
@@ -350,6 +360,7 @@ function myLeads_(staff) {
   return leads.map(function (r) {
     var o = {};
     LEAD_FIELDS.forEach(function (f) { o[f] = String(r[f] == null ? '' : r[f]); });
+    o.samples_given = isTrue_(r.samples_given);
     o.lead_id = String(r.lead_id);
     o.staff_id = String(r.staff_id);
     o.staff_name = String(r.staff_name || '');
@@ -420,27 +431,23 @@ function cleanLead_(l) {
   o.customer_code = o.customer_code.toUpperCase();
   o.original_walkin_code = o.original_walkin_code.toUpperCase();
   o.code_type = o.code_type === 'WALKIN' ? 'WALKIN' : 'REGISTERED';
+  o.samples_given = isTrue_(l.samples_given);   // stored as a real TRUE/FALSE cell
   return o;
 }
 
 function cleanItem_(it) {
-  var qty = Math.max(0, Math.min(999, Math.floor(Number(it.sample_qty) || 0)));
-  var given = isTrue_(it.sample_given);
   return {
     product_code: str_(it.product_code, 100),
     product_name: str_(it.product_name, 200),
     product_SKU: str_(it.product_SKU, 100),
+    main_category: str_(it.main_category, 100),
     category: str_(it.category, 100),
-    interest_level: str_(it.interest_level, 20),
-    sample_given: given,
-    sample_qty: given ? (qty || 1) : 0
+    interest_level: str_(it.interest_level, 20)
   };
 }
 
 function itemsSummary_(items) {
-  return items.map(function (i) {
-    return i.product_code + ' ' + i.interest_level + (i.sample_given ? ' sample x' + i.sample_qty : '');
-  }).sort().join('; ');
+  return items.map(function (i) { return i.product_code + ' ' + i.interest_level; }).sort().join('; ');
 }
 
 function writeItems_(sh, hdr, leadId, code, staffId, updatedAt, items) {
@@ -448,8 +455,8 @@ function writeItems_(sh, hdr, leadId, code, staffId, updatedAt, items) {
   var rows = items.map(function (i) {
     var o = {
       lead_id: leadId, customer_code: code, product_code: i.product_code, product_name: i.product_name,
-      product_SKU: i.product_SKU, category: i.category, interest_level: i.interest_level,
-      sample_given: i.sample_given, sample_qty: i.sample_qty, staff_id: staffId, updated_at: updatedAt
+      product_SKU: i.product_SKU, main_category: i.main_category, category: i.category,
+      interest_level: i.interest_level, staff_id: staffId, updated_at: updatedAt
     };
     return objToRow_(hdr, o);
   });

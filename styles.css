@@ -124,6 +124,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); out
 .item-row .seg { flex: 1; min-width: 200px; }
 .check { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; font-size: 15px; }
 .check input { width: 24px; height: 24px; margin: 0; -webkit-appearance: checkbox; appearance: auto; accent-color: var(--brand); }
+.samples-check { margin-top: 16px; padding: 12px; border-radius: 12px; background: var(--accent); }
+.samples-check + .muted { margin: 6px 2px 0; }
+.group-head { margin: 14px 0 2px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .qty { display: flex; align-items: center; gap: 6px; }
 .qty button { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 20px; font-weight: 700; cursor: pointer; }
 .qty span { min-width: 22px; text-align: center; font-weight: 700; }

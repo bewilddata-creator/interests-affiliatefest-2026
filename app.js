@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.0.0';
+  var APP_VERSION = '1.1.0';
   var API_URL = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || '';
   var K = { session: 'bl.session', products: 'bl.products', leads: 'bl.leads', seq: 'bl.walkinSeq.' };
   var SYNC_BATCH = 15;
@@ -155,7 +155,7 @@
   var draft, editingId = null;
   function emptyDraft() {
     return { mode: 'REGISTERED', walkinExisting: false, customer_code: '', original_walkin_code: '', link_code: '',
-      visitor_name: '', visitor_phone: '', visitor_brand: '', items: [], lead_temp: '', next_action: '', notes: '' };
+      visitor_name: '', visitor_phone: '', visitor_brand: '', items: [], lead_temp: '', next_action: '', notes: '', samples_given: false };
   }
 
   function nextWalkinCode() {
@@ -258,10 +258,15 @@
 
   /* --------------------------------------------------------- products */
   var activeCat = '';
+  var MAIN_ORDER = ['Lips', 'Cheeks', 'Eyes', 'Base', 'Skincare'];
+  function mainCat(p) { return p.main_category || p.category || 'Other'; }
   function renderCatChips() {
     var cats = [];
-    products.forEach(function (p) { if (p.category && cats.indexOf(p.category) === -1) cats.push(p.category); });
-    cats.sort();
+    products.forEach(function (p) { var c = mainCat(p); if (cats.indexOf(c) === -1) cats.push(c); });
+    cats.sort(function (a, b) {
+      var ia = MAIN_ORDER.indexOf(a), ib = MAIN_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || (a < b ? -1 : 1);
+    });
     var box = $('cat-chips'); box.innerHTML = '';
     if (!cats.length) return;
     [''].concat(cats).forEach(function (c) {
@@ -277,12 +282,23 @@
     if (!q && !activeCat) return;
     var words = q.split(/\s+/).filter(Boolean);
     var hits = products.filter(function (p) {
-      if (activeCat && p.category !== activeCat) return false;
-      var hay = norm(p.product_code + ' ' + p.product_name + ' ' + p.product_SKU + ' ' + p.category);
+      if (activeCat && mainCat(p) !== activeCat) return false;
+      var hay = norm(p.product_code + ' ' + p.product_name + ' ' + p.product_SKU + ' ' + p.category + ' ' + p.main_category);
       return words.every(function (w) { return hay.indexOf(w) !== -1; });
     });
-    var limit = q ? 15 : 60;
+    var limit = q ? 20 : 80;
+    // Group by product type (Lip Oil, Lip Tint, …), keeping the sheet's order inside each group.
+    var groups = [], byType = {};
     hits.slice(0, limit).forEach(function (p) {
+      var t = p.category || 'Other';
+      if (!byType[t]) { byType[t] = []; groups.push(t); }
+      byType[t].push(p);
+    });
+    groups.forEach(function (t) {
+      box.appendChild(h('div', { class: 'group-head', text: t }));
+      byType[t].forEach(renderResult);
+    });
+    function renderResult(p) {
       var added = draft.items.some(function (i) { return i.product_code === p.product_code; });
       box.appendChild(h('button', { type: 'button', class: 'result' + (added ? ' added' : ''), onclick: function () { addItem(p); } }, [
         h('div', null, [
@@ -291,20 +307,20 @@
         ]),
         h('span', { class: 'plus', text: added ? '✓' : '+' })
       ]));
-    });
+    }
     if (hits.length > limit) box.appendChild(h('div', { class: 'muted small', text: (hits.length - limit) + ' more — keep typing to narrow down.' }));
     if (q && !hits.length) {
       var raw = $('product-search').value.trim();
       box.appendChild(h('div', { class: 'muted small', text: products.length ? 'No product matches “' + raw + '”.' : 'Product list not loaded yet (needs internet once).' }));
       box.appendChild(h('button', { type: 'button', class: 'btn ghost small', text: 'Add “' + raw + '” as a custom item',
-        onclick: function () { addItem({ product_code: raw.toUpperCase(), product_name: raw, product_SKU: '', category: 'Custom' }); } }));
+        onclick: function () { addItem({ product_code: raw.toUpperCase(), product_name: raw, product_SKU: '', main_category: 'Other', category: 'Custom' }); } }));
     }
   }
 
   function addItem(p) {
     if (draft.items.some(function (i) { return i.product_code === p.product_code; })) { toast('Already added'); return; }
-    draft.items.push({ product_code: p.product_code, product_name: p.product_name, product_SKU: p.product_SKU || '', category: p.category || '',
-      interest_level: 'Medium', sample_given: false, sample_qty: 0 });
+    draft.items.push({ product_code: p.product_code, product_name: p.product_name, product_SKU: p.product_SKU || '',
+      main_category: p.main_category || '', category: p.category || '', interest_level: 'Medium' });
     $('product-search').value = '';
     renderResults(); renderItems();
   }
@@ -316,13 +332,6 @@
         return h('button', { type: 'button', class: it.interest_level === lvl ? 'on' : '', text: lvl,
           onclick: function () { it.interest_level = lvl; renderItems(); } });
       }));
-      var chk = h('input', { type: 'checkbox', checked: it.sample_given,
-        onchange: function () { it.sample_given = this.checked; it.sample_qty = this.checked ? (it.sample_qty || 1) : 0; renderItems(); } });
-      var qty = it.sample_given ? h('div', { class: 'qty' }, [
-        h('button', { type: 'button', text: '−', 'aria-label': 'Less', onclick: function () { it.sample_qty = Math.max(1, it.sample_qty - 1); renderItems(); } }),
-        h('span', { text: String(it.sample_qty) }),
-        h('button', { type: 'button', text: '+', 'aria-label': 'More', onclick: function () { it.sample_qty = Math.min(99, it.sample_qty + 1); renderItems(); } })
-      ]) : null;
       box.appendChild(h('div', { class: 'item' }, [
         h('div', { class: 'item-head' }, [
           h('div', null, [
@@ -331,8 +340,7 @@
           ]),
           h('button', { type: 'button', class: 'remove', 'aria-label': 'Remove', text: '×', onclick: function () { draft.items.splice(idx, 1); renderItems(); renderResults(); } })
         ]),
-        h('div', { class: 'item-row' }, [seg]),
-        h('div', { class: 'item-row' }, [h('label', { class: 'check' }, [chk, 'Sample given']), qty])
+        h('div', { class: 'item-row' }, [seg])
       ]));
     });
   }
@@ -357,6 +365,7 @@
     var base = {
       visitor_name: vname, visitor_phone: $('visitor_phone').value.trim(), visitor_brand: $('visitor_brand').value.trim(),
       lead_temp: draft.lead_temp, next_action: $('next_action').value, notes: $('notes').value.trim(),
+      samples_given: $('samples_given').checked,
       items: draft.items.map(function (i) { return Object.assign({}, i); })
     };
 
@@ -427,6 +436,7 @@
     draft = emptyDraft();
     ['code', 'walkin-code-input', 'link-code-input', 'visitor_name', 'visitor_phone', 'visitor_brand', 'notes', 'product-search'].forEach(function (id) { $(id).value = ''; });
     $('next_action').value = '';
+    $('samples_given').checked = false;
     $('edit-banner').hidden = true;
     $('cancel-edit').hidden = true;
     $('link-code').hidden = true;
@@ -463,6 +473,7 @@
     $('visitor_brand').value = l.visitor_brand || '';
     $('next_action').value = l.next_action || '';
     $('notes').value = l.notes || '';
+    $('samples_given').checked = l.samples_given === true || String(l.samples_given).toLowerCase() === 'true';
     renderItems(); renderTemp();
     var b = $('edit-banner');
     b.innerHTML = '';
@@ -495,14 +506,14 @@
     if (!list.length) { box.appendChild(h('div', { class: 'empty', text: q ? 'No matching leads.' : 'No leads yet. They appear here after you save one.' })); return; }
     list.forEach(function (l) {
       var status = l._error ? ['error', 'Not synced: ' + l._error] : l._pending ? ['pending', 'Waiting to sync'] : ['synced', 'Synced ✓'];
-      var samples = (l.items || []).filter(function (i) { return i.sample_given; }).length;
+      var samples = l.samples_given === true || String(l.samples_given).toLowerCase() === 'true';
       box.appendChild(h('button', { type: 'button', class: 'lead', onclick: function () { editLead(l.lead_id); } }, [
         h('div', { class: 'lead-top' }, [
           h('span', { class: 'lead-code', text: l.customer_code }),
           l.lead_temp ? h('span', { class: 'badge ' + l.lead_temp, text: l.lead_temp }) : null
         ]),
         h('div', { class: 'lead-name', text: [l.visitor_name, l.visitor_brand].filter(Boolean).join(' · ') || '(no name)' }),
-        h('div', { class: 'lead-meta', text: (l.items || []).length + ' product(s)' + (samples ? ' · ' + samples + ' sample(s)' : '') +
+        h('div', { class: 'lead-meta', text: (l.items || []).length + ' product(s)' + (samples ? ' · samples ✓' : '') +
           ' · ' + fmtTime(l.created_at) + (l.edit_count ? ' · edited ' + l.edit_count + '×' : '') }),
         h('div', { class: 'status ' + status[0], text: status[1] })
       ]));
